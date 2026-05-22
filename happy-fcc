@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Wrapper: strip ANTHROPIC_* vars, set proxy env, then run happy.
+# Usage: ./happy-fcc [happy args...]
+
+set -e
+
+# ---- proxy config (reads ~/.fcc/.env, defaults) ----
+PORT=8082
+AUTH_TOKEN=""
+if [ -f "$HOME/.fcc/.env" ]; then
+    _p=$(grep -oP '^PORT\s*=\s*\K\d+' "$HOME/.fcc/.env" 2>/dev/null || true)
+    [ -n "$_p" ] && PORT="$_p"
+    _t=$(grep -oP '^ANTHROPIC_AUTH_TOKEN\s*=\s*\K.+' "$HOME/.fcc/.env" 2>/dev/null || true)
+    [ -n "$_t" ] && AUTH_TOKEN="$_t"
+fi
+
+# ---- strip ALL ANTHROPIC_* from the env (mimics _claude_child_env) ----
+for _var in $(env | grep '^ANTHROPIC_' | cut -d= -f1); do
+    unset "$_var"
+done
+
+# ---- build the happy command ----
+set -- happy \
+    --claude-env "ANTHROPIC_BASE_URL=http://127.0.0.1:$PORT" \
+    --claude-env "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1" \
+    --claude-env "CLAUDE_CODE_AUTO_COMPACT_WINDOW=190000" \
+    ${AUTH_TOKEN:+--claude-env "ANTHROPIC_AUTH_TOKEN=$AUTH_TOKEN"} \
+    "$@"
+
+exec "${@}"
