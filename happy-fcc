@@ -1,8 +1,24 @@
 #!/usr/bin/env bash
 # Wrapper: strip ANTHROPIC_* vars, set proxy env, then run happy.
-# Usage: ./happy-fcc [happy args...]
+# Usage: ./happy-fcc [--1m] [happy args...]
+#
+#   --1m    Disable the 260k auto-compact window, allowing the full 1M
+#           context window of the underlying model.
 
 set -e
+
+# ---- parse flags ----
+ONE_M=0
+HAPPY_ARGS=()
+
+for arg in "$@"; do
+    case "$arg" in
+        --1m) ONE_M=1 ;;
+        *) HAPPY_ARGS+=("$arg") ;;
+    esac
+done
+
+set -- "${HAPPY_ARGS[@]}"
 
 # ---- proxy config (reads ~/.fcc/.env, defaults) ----
 PORT=8082
@@ -19,12 +35,25 @@ for _var in $(env | grep '^ANTHROPIC_' | cut -d= -f1); do
     unset "$_var"
 done
 
-# ---- build the happy command ----
-set -- happy \
-    --claude-env "ANTHROPIC_BASE_URL=http://127.0.0.1:$PORT" \
-    --claude-env "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1" \
-    --claude-env "CLAUDE_CODE_AUTO_COMPACT_WINDOW=190000" \
-    ${AUTH_TOKEN:+--claude-env "ANTHROPIC_AUTH_TOKEN=$AUTH_TOKEN"} \
-    "$@"
+# ---- build arg array ----
+HAPPY_CMD=(
+    happy
+    --claude-env "ANTHROPIC_BASE_URL=http://127.0.0.1:$PORT"
+    --claude-env "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1"
+    --claude-env "API_TIMEOUT_MS=1200000"
+    --claude-env "CLAUDE_STREAM_IDLE_TIMEOUT_MS=180000"
+)
 
-exec "${@}"
+# Conditional compact window (omitted with --1m)
+if [ "$ONE_M" -eq 0 ]; then
+    HAPPY_CMD+=(--claude-env "CLAUDE_CODE_AUTO_COMPACT_WINDOW=260000")
+fi
+
+# Optional auth token
+if [ -n "$AUTH_TOKEN" ]; then
+    HAPPY_CMD+=(--claude-env "ANTHROPIC_AUTH_TOKEN=$AUTH_TOKEN")
+fi
+
+HAPPY_CMD+=("$@")
+
+exec "${HAPPY_CMD[@]}"
