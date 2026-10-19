@@ -14,15 +14,18 @@ set ONE_M=0
 
 REM ---- read ~/.fcc/.env if present ----
 if exist "%USERPROFILE%\.fcc\.env" (
-    for /f "usebackq tokens=1,2 delims==" %%a in ("%USERPROFILE%\.fcc\.env") do (
+    REM tokens=1* de giu nguyen phan sau dau '=' dau tien (token co the chua '=')
+    for /f "usebackq tokens=1* delims==" %%a in ("%USERPROFILE%\.fcc\.env") do (
         set "_key=%%a"
         set "_key=!_key: =!"
+        set "_val=%%b"
+        for /f "tokens=* delims= " %%v in ("!_val!") do set "_val=%%v"
         if "!_key!"=="PORT" (
-            set "PORT=%%b"
+            set "PORT=!_val!"
             set "PORT=!PORT: =!"
         )
         if "!_key!"=="ANTHROPIC_AUTH_TOKEN" (
-            set "AUTH_TOKEN=%%b"
+            set "AUTH_TOKEN=!_val!"
         )
     )
 )
@@ -59,9 +62,11 @@ if %ONE_M%==0 (
 )
 
 REM ---- optional auth token ----
-if not "%AUTH_TOKEN%"=="" (
-    set ENV_ARGS=%ENV_ARGS% --claude-env "ANTHROPIC_AUTH_TOKEN=%AUTH_TOKEN%"
+if not "!AUTH_TOKEN!"=="" (
+    set ENV_ARGS=!ENV_ARGS! --claude-env "ANTHROPIC_AUTH_TOKEN=!AUTH_TOKEN!"
 )
 
+REM Tat delayed expansion truoc khi chay de '!' trong token/args khong bi an
+setlocal DisableDelayedExpansion
 happy %ENV_ARGS% %HAPPY_ARGS%
 exit /b %ERRORLEVEL%

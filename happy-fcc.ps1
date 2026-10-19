@@ -74,5 +74,11 @@ if ($AuthToken) {
 $HappyCmd += $RemainingArgs
 
 # ---- exec ----
-& $HappyCmd[0] $HappyCmd[1..$HappyCmd.Length]
+# NOTE: phai splat mang (@) va cat dung $Length - 1. Neu viet
+# `& $cmd $arr[1..$Length]` thi Windows PowerShell 5.1 gop ca mang
+# thanh MOT argument duy nhat (happy se chuyen nguyen chuoi cho claude
+# -> "unknown option '--claude-env ... --resume ...'").
+$HappyExe = $HappyCmd[0]
+$HappyRest = $HappyCmd[1..($HappyCmd.Length - 1)]
+& $HappyExe @HappyRest
 exit $LASTEXITCODE
